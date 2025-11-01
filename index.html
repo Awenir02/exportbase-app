@@ -3,7 +3,6 @@
   <head>
     <meta charset="UTF-8" />
     <title>Проверка компании (Export-Base)</title>
-    <script src="//api.bitrix24.com/api/v1/"></script>
     <style>
       body {
         font-family: sans-serif;
@@ -49,23 +48,8 @@
 
     <script>
       const PROXY_URL =
-        "https://script.google.com/macros/s/AKfycbyuI2twj2dbsY6fr7_qBwc2-33mLn25sMk9jX9c545KGfeOR4ipm6XZh_pjkTyhS1xDNw/exec";
-      const API_KEY = "epswrrlehbimgd9";
-
-      // Автоматически подставляем ИНН из карточки CRM
-      BX24.ready(() => {
-        BX24.init(() => {
-          BX24.callMethod(
-            "crm.company.get",
-            { id: BX24.placement.info().options.ID },
-            (res) => {
-              if (res && res.data() && res.data().UF_CRM_INN) {
-                document.getElementById("inn").value = res.data().UF_CRM_INN;
-              }
-            }
-          );
-        });
-      });
+        "https://script.google.com/macros/s/AKfycbwgnQN3EGcB7yj4wKYg4_ORQnM1eKDjBVNOXDIdyd0SbxMPrBMvj5RapEIIWupqqy2c2g/exec"; // твой Google Script
+      const API_KEY = "epswrrlehbimgd9"; // твой ключ export-base.ru
 
       document.getElementById("check").addEventListener("click", async () => {
         const inn = document.getElementById("inn").value.trim();
@@ -76,7 +60,10 @@
           return;
         }
 
+        // Формируем правильный URL к export-base.ru
         const apiUrl = `https://export-base.ru/api/company/?inn=${inn}&key=${API_KEY}`;
+
+        // Проксируем через Google Script, чтобы обойти CORS
         const fullUrl = `${PROXY_URL}?url=${encodeURIComponent(apiUrl)}`;
 
         resultBox.textContent = "Загрузка...";
@@ -85,9 +72,12 @@
           const res = await fetch(fullUrl);
           const data = await res.json();
 
-          if (data.error) {
-            resultBox.textContent = "Ошибка: " + data.error;
-          } else if (data.companies_data && data.companies_data.length > 0) {
+          if (data.error || data.code) {
+            resultBox.textContent = `Ошибка API: ${data.error || data.reason}`;
+            return;
+          }
+
+          if (data.companies_data && data.companies_data.length > 0) {
             const company = data.companies_data[0];
             resultBox.textContent =
               `🏢 ${company.legal_name}\n` +
