@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Проверка компании (Export-Base)</title>
+    <script src="//api.bitrix24.com/api/v1/"></script>
+    <style>
+      body {
+        font-family: sans-serif;
+        padding: 16px;
+        background: #f5f7fa;
+      }
+      h2 {
+        margin-bottom: 12px;
+      }
+      input,
+      button {
+        padding: 8px;
+        margin: 5px 0;
+        width: 100%;
+        border-radius: 6px;
+        border: 1px solid #ccc;
+      }
+      button {
+        background: #2fc6f6;
+        color: #fff;
+        cursor: pointer;
+        border: none;
+        transition: background 0.2s;
+      }
+      button:hover {
+        background: #1baddc;
+      }
+      pre {
+        background: #fff;
+        border: 1px solid #ddd;
+        padding: 10px;
+        border-radius: 6px;
+        overflow: auto;
+        max-height: 300px;
+      }
+    </style>
+  </head>
+  <body>
+    <h2>Проверка компании в Export-Base</h2>
+    <input type="text" id="inn" placeholder="Введите ИНН" />
+    <button id="check">Проверить</button>
+    <pre id="result">Результат появится здесь...</pre>
+
+    <script>
+      const PROXY_URL =
+        "https://script.google.com/macros/s/AKfycbyuI2twj2dbsY6fr7_qBwc2-33mLn25sMk9jX9c545KGfeOR4ipm6XZh_pjkTyhS1xDNw/exec";
+      const API_KEY = "epswrrlehbimgd9";
+
+      // Автоматически подставляем ИНН из карточки CRM
+      BX24.ready(() => {
+        BX24.init(() => {
+          BX24.callMethod(
+            "crm.company.get",
+            { id: BX24.placement.info().options.ID },
+            (res) => {
+              if (res && res.data() && res.data().UF_CRM_INN) {
+                document.getElementById("inn").value = res.data().UF_CRM_INN;
+              }
+            }
+          );
+        });
+      });
+
+      document.getElementById("check").addEventListener("click", async () => {
+        const inn = document.getElementById("inn").value.trim();
+        const resultBox = document.getElementById("result");
+
+        if (!inn) {
+          resultBox.textContent = "Введите ИНН!";
+          return;
+        }
+
+        const apiUrl = `https://export-base.ru/api/company/?inn=${inn}&key=${API_KEY}`;
+        const fullUrl = `${PROXY_URL}?url=${encodeURIComponent(apiUrl)}`;
+
+        resultBox.textContent = "Загрузка...";
+
+        try {
+          const res = await fetch(fullUrl);
+          const data = await res.json();
+
+          if (data.error) {
+            resultBox.textContent = "Ошибка: " + data.error;
+          } else if (data.companies_data && data.companies_data.length > 0) {
+            const company = data.companies_data[0];
+            resultBox.textContent =
+              `🏢 ${company.legal_name}\n` +
+              `📍 ${company.address}\n` +
+              `📅 Регистрация: ${company.reg_date}\n` +
+              `👨‍💼 ${company.ceo_name} (${company.ceo_position})\n` +
+              `💼 ОКВЭД: ${company.main_okved_name}\n` +
+              `📞 ${company.stationary_phone || "-"}\n` +
+              `📧 ${company.email || "-"}`;
+          } else {
+            resultBox.textContent = "Компания не найдена.";
+          }
+        } catch (err) {
+          resultBox.textContent = "Ошибка запроса: " + err.message;
+        }
+      });
+    </script>
+  </body>
+</html>
